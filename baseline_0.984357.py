@@ -18,8 +18,28 @@ pd.set_option('display.max_rows', 200)
 
 def main():
     # 读入数据
-    base_info_pd = pd.read_csv('./datasets/train/base_info.csv')
-    label_pd = pd.read_csv('./datasets/train/entprise_info.csv')
+    base_info_pd = pd.read_csv(r'./datasets/train/base_info.csv', index_col=0)
+    label_pd = pd.read_csv(r'./datasets/train/entprise_info.csv')
+    news_info_pd = pd.read_csv(r'./datasets/train/news_info.csv')
+    # 积极舆论数量
+    base_info_pd['positive'] = 0
+    # 消极舆论数量
+    base_info_pd['negative'] = 0
+    # 中立舆论数量
+    base_info_pd['neutral'] = 0
+    print(base_info_pd)
+    ids_in_news_info = np.unique(news_info_pd['id'])
+    for id in ids_in_news_info:
+        count = news_info_pd[news_info_pd['id'] == id].drop(['public_date'], axis=1).groupby('positive_negtive')[
+            'id'].count().reset_index(name="count")
+        count = count.to_numpy()
+        for item in count:
+            if item[0] == '积极':
+                base_info_pd.loc[id, 'positive'] = item[1]
+            elif item[0] == '中立':
+                base_info_pd.loc[id, 'neutral'] = item[1]
+            elif item[0] == '消极':
+                base_info_pd.loc[id, 'negative'] = item[1]
     # 基于id对数据进行连接
     merged_pd = pd.merge(base_info_pd, label_pd, on=['id'], how='left')
     # 缺失值太多的列
@@ -30,7 +50,9 @@ def main():
     # 单一值太多的列
     same_value_feature_label = ['dom', 'opscope', 'oploc']
     # 移除缺失值和单一值太多的列
-    for label in missing_value_feature_label:
+    # for label in missing_value_feature_label:
+    #     del merged_pd[label]
+    for label in ['opto', 'opform']:
         del merged_pd[label]
     for label in same_value_feature_label:
         del merged_pd[label]
@@ -68,9 +90,14 @@ def main():
     # train_data['regcap'] = train_data['regcap'].fillna(0)
     # test_data['industryco'] = test_data['industryco'].fillna(0)
     # test_data['regcap'] = test_data['regcap'].fillna(0)
+    for label in missing_value_feature_label:
+        if label == 'opto' or label == 'opform':
+            continue
+        train_data[label] = train_data[label].fillna(0)
+        test_data[label] = test_data[label].fillna(0)
     # 实例化模型
     model = lgb.LGBMClassifier(boosting_type='rf', num_leaves=128, reg_alpha=0., reg_lambda=0.01, metric='rmse',
-                               max_depth=-1, learning_rate=0.04, min_child_samples=10, seed=1018, n_estimators=3000,
+                               max_depth=-1, learning_rate=0.01, min_child_samples=10, seed=1018, n_estimators=3000,
                                subsample=0.7, colsample_bytree=0.7, subsample_freq=1)
     # model = cb.CatBoostClassifier(iterations=5000, learning_rate=0.04, random_seed=1018, verbose=100)
     # model = xgb.XGBClassifier(n_estimators=5000, max_depth=0, learning_rate=0.05)
