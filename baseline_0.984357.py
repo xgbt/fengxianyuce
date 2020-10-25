@@ -21,6 +21,7 @@ def main():
     base_info_pd = pd.read_csv(r'./datasets/train/base_info.csv', index_col=0)
     label_pd = pd.read_csv(r'./datasets/train/entprise_info.csv')
     news_info_pd = pd.read_csv(r'./datasets/train/news_info.csv')
+    other_info_pd = pd.read_csv(r'./datasets/train/other_info.csv')
     # 积极舆论数量
     base_info_pd['positive'] = 0
     # 消极舆论数量
@@ -40,13 +41,14 @@ def main():
                 base_info_pd.loc[id, 'neutral'] = item[1]
             elif item[0] == '消极':
                 base_info_pd.loc[id, 'negative'] = item[1]
-    # 基于id对数据进行连接
+    # 基于id对数据进行连接，这里
     merged_pd = pd.merge(base_info_pd, label_pd, on=['id'], how='left')
+    merged_pd = pd.merge(merged_pd, other_info_pd, on=['id'], how='left')
     # 缺失值太多的列
     missing_value_feature_label = ['enttypeitem', 'opto', 'empnum', 'compform', 'parnum',
                                    'exenum', 'opform', 'ptbusscope', 'venind', 'enttypeminu',
                                    'midpreindcode', 'protype', 'reccap', 'forreccap',
-                                   'forregcap', 'congro']
+                                   'forregcap', 'congro', 'legal_judgment_num', 'brand_num', 'patent_num']
     # 单一值太多的列
     same_value_feature_label = ['dom', 'opscope', 'oploc']
     # 移除缺失值和单一值太多的列
