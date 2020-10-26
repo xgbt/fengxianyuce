@@ -22,17 +22,21 @@ def main():
     label_pd = pd.read_csv(r'./datasets/train/entprise_info.csv')
     news_info_pd = pd.read_csv(r'./datasets/train/news_info.csv')
     other_info_pd = pd.read_csv(r'./datasets/train/other_info.csv')
+    change_info_pd = pd.read_csv(r'./datasets/train/change_info.csv')
+    # 企业变更信息的次数
+    base_info_pd['change_count'] = 0
+    for item in change_info_pd.groupby('id')['id'].count().reset_index(name='count').to_numpy():
+        base_info_pd.loc[item[0], 'change_count'] = item[1]
     # 积极舆论数量
     base_info_pd['positive'] = 0
     # 消极舆论数量
     base_info_pd['negative'] = 0
     # 中立舆论数量
     base_info_pd['neutral'] = 0
-    print(base_info_pd)
     ids_in_news_info = np.unique(news_info_pd['id'])
     for id in ids_in_news_info:
         count = news_info_pd[news_info_pd['id'] == id].drop(['public_date'], axis=1).groupby('positive_negtive')[
-            'id'].count().reset_index(name="count")
+            'id'].count().reset_index(name='count')
         count = count.to_numpy()
         for item in count:
             if item[0] == '积极':
