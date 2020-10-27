@@ -6,7 +6,7 @@ import seaborn as sns
 import lightgbm as lgb
 import xgboost as xgb
 import matplotlib.pyplot as plt
-
+import csv
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
@@ -16,9 +16,6 @@ pd.set_option('display.max_colwidth', 200)
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.max_rows', 200)
 
-import gc
-
-gc.collect()
 
 # 模型预测模块化
 def get_predict_w(model, data, label='label', feature=[], cate_feature=[], random_state=2018, n_splits=5,
@@ -75,18 +72,53 @@ def get_predict_w(model, data, label='label', feature=[], cate_feature=[], rando
 
 def main():
     # 读文件
-    base = pd.read_csv('./datasets/train/base_info.csv')
+    base = pd.read_csv('./datasets/train/base_info.csv', index_col=0)
     label = pd.read_csv('./datasets/train/entprise_info.csv')
+
+    news_info_pd = pd.read_csv(r'./datasets/train/news_info.csv')
+    other_info_pd = pd.read_csv(r'./datasets/train/other_info.csv')
+    change_info_pd = pd.read_csv(r'./datasets/train/change_info.csv')
+    # 企业变更信息的次数
+    base['change_count'] = 0
+    for item in change_info_pd.groupby('id')['id'].count().reset_index(name='count').to_numpy():
+        base.loc[item[0], 'change_count'] = item[1]
+    # 积极舆论数量
+    base['positive'] = 0
+    # 消极舆论数量
+    base['negative'] = 0
+    # 中立舆论数量
+    base['neutral'] = 0
+    ids_in_news_info = np.unique(news_info_pd['id'])
+    for id in ids_in_news_info:
+        count = news_info_pd[news_info_pd['id'] == id].drop(['public_date'], axis=1).groupby('positive_negtive')[
+            'id'].count().reset_index(name='count')
+        count = count.to_numpy()
+        for item in count:
+            if item[0] == '积极':
+                base.loc[id, 'positive'] = item[1]
+            elif item[0] == '中立':
+                base.loc[id, 'neutral'] = item[1]
+            elif item[0] == '消极':
+                base.loc[id, 'negative'] = item[1]
     # 合并文件
     base = pd.merge(base, label, on=['id'], how='left')
-
+    base = pd.merge(base, other_info_pd, on=['id'], how='left')
     # 删除有缺失的、单一值
     drop = ['enttypeitem', 'opto', 'empnum', 'compform', 'parnum',
             'exenum', 'opform', 'ptbusscope', 'venind', 'enttypeminu',
             'midpreindcode', 'protype', 'reccap', 'forreccap',
-            'forregcap', 'congro']
-    for f in drop:
-        del base[f]
+            'forregcap', 'congro', 'legal_judgment_num', 'brand_num', 'patent_num']
+    for label in drop:
+        if label == 'opto' or label == 'opform':
+            continue
+        base[label] = base[label].fillna(0)
+    print(base)
+
+    # for f in drop:
+    #     del base[f]
+    for label in ['opto', 'opform']:
+        del base[label]
+
     del base['dom'], base['opscope']  # 单一值太多
     del base['oploc']
 
@@ -104,7 +136,9 @@ def main():
     # 不需要的特征
     drop = ['id', 'label']
     # 类别特征
-    cat = ['industryphy']
+    # cat = ['industryphy']
+    cat = ['protype', 'midpreindcode', 'venind', 'enttypeminu', 'enttypeitem', 'industryphy', 'compform', 'opform',
+           'ptbusscope']
     for j in list(data.columns):
         if j in drop:
             continue
@@ -120,26 +154,35 @@ def main():
 
     # 训练
     lgb_model = lgb.LGBMRegressor(
-        boosting_type='rf',
         num_leaves=64, reg_alpha=0., reg_lambda=0.01, metric='rmse',
-        max_depth=-1, learning_rate=0.05, min_child_samples=10, seed=2020,
-        n_estimators=2000, subsample=0.7, colsample_bytree=0.7, subsample_freq=1,
+        max_depth=-1, learning_rate=0.03, min_child_samples=10, seed=1018,
+        n_estimators=3000, subsample=0.7, colsample_bytree=0.7, subsample_freq=1,
     )
     xgb_model = xgb.sklearn.XGBRegressor()
 
     data, predict_label = get_predict_w(lgb_model, data, label='label',
                                         feature=features, cate_feature=cate_feat,
-                                        random_state=2020, n_splits=20, model_type='lgb')
+                                        random_state=1018, n_splits=10, model_type='lgb')
 
     data['score'] = data[predict_label]
-    # data['forecastVolum'] = data['lgb'].apply(lambda x: -x if x < 0 else x)
-    df = data[data.label.isnull()][['id', 'score']]
-    # 对结果进行修正
-    df['score'] = df['score'].apply(lambda x: 0 if x < 0 else x)
-    df['score'] = df['score'].apply(lambda x: 1 if x > 1 else x)
-    # 输出结果
-    df.to_csv('results/result.csv', index=False)
-
+    result = {}
+    for id, predict_score in zip(data['id'].to_numpy(), data['score'].to_numpy()):
+        result[id] = predict_score
+    submission_pd = pd.read_csv(r'./datasets/entprise_submit.csv')
+    with open('result.csv ', 'w', encoding='utf-8', newline='') as f:
+        csv_writer = csv.writer(f)
+        csv_writer.writerow(submission_pd.columns.values)
+        for submission in submission_pd.values:
+            # csv_writer.writerow([submission[0], result[submission[0]]])
+            # csv_writer.writerow([submission[0], result[submission[0]]])
+            csv_writer.writerow([submission[0], '{:.16f}'.format(result[submission[0]])])
+    # # data['forecastVolum'] = data['lgb'].apply(lambda x: -x if x < 0 else x)
+    # df = data[data.label.isnull()][['id', 'score']]
+    # # 对结果进行修正
+    # df['score'] = df['score'].apply(lambda x: 0 if x < 0 else x)
+    # df['score'] = df['score'].apply(lambda x: 1 if x > 1 else x)
+    # # 输出结果
+    # df.to_csv('results/result.csv', index=False)
 
 
 if __name__ == '__main__':
