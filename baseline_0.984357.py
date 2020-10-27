@@ -109,7 +109,20 @@ def main():
     # model = xgb.XGBClassifier(n_estimators=5000, max_depth=0, learning_rate=0.05)
     # 训练模型
     model.fit(train_data[features], train_data['label'])
-    # 预测两个分类的得分
+    # # 直接写入标签而不是得分
+    # predict_result = model.predict(test_data[features])
+    # result = {}
+    # for id, predict_label in zip(test_data['id'].to_numpy(), predict_result):
+    #     result[id] = predict_label
+    # submission_pd = pd.read_csv(r'./datasets/entprise_submit.csv')
+    # with open('result.csv ', 'w', encoding='utf-8', newline='') as f:
+    #     csv_writer = csv.writer(f)
+    #     csv_writer.writerow(submission_pd.columns.values)
+    #     for submission in submission_pd.values:
+    #         # csv_writer.writerow([submission[0], result[submission[0]]])
+    #         csv_writer.writerow([submission[0], result[submission[0]]])
+
+    # 预测得分
     proba = model.predict_proba(test_data[features])
     # 读取结果并写入到csv文件
     result = {}
@@ -122,6 +135,7 @@ def main():
         for submission in submission_pd.values:
             # csv_writer.writerow([submission[0], result[submission[0]]])
             csv_writer.writerow([submission[0], '{:.16f}'.format(result[submission[0]])])
+
     # kfold = KFold(n_splits=10, shuffle=True)
     # for train_index, test_index in kfold.split(train_data):
     #     train_x = train_data.loc[train_index][features]
