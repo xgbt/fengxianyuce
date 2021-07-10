@@ -176,6 +176,7 @@ def main():
             # csv_writer.writerow([submission[0], result[submission[0]]])
             # csv_writer.writerow([submission[0], result[submission[0]]])
             csv_writer.writerow([submission[0], '{:.16f}'.format(result[submission[0]])])
+            ##
     # # data['forecastVolum'] = data['lgb'].apply(lambda x: -x if x < 0 else x)
     # df = data[data.label.isnull()][['id', 'score']]
     # # 对结果进行修正
